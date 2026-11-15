@@ -5,16 +5,15 @@ let loginUrl = "/";
 
 const isProduction = process.env.NODE_ENV === "production";
 
+// podesavanje kolacica
 function cookieOptions() {
   return {
     signed: true,
     httpOnly: true,
     secure: isProduction,
-    // Cross-site POST mora moći poslati cookie u Render demonstraciji.
-    // Lokalni localhost:3000 i localhost:4000 su isti site.
     sameSite: isProduction ? "none" : "lax",
     maxAge: 60 * 60 * 1000,
-    path: "/"
+    path: "/",
   };
 }
 
@@ -23,7 +22,7 @@ function clearCookieOptions() {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
-    path: "/"
+    path: "/",
   };
 }
 
@@ -33,8 +32,6 @@ function initCookieAuth(app, pageLoginUrl = "/") {
   app.use(setUserInfo);
 }
 
-// Nema XSS demonstracije pa je httpOnly uvijek uključen.
-// Vraćamo CSRF token kako bi ga EJS mogao staviti u legitimne forme.
 function signInUser(res, username) {
   const csrfToken = cryptoRandomToken();
 

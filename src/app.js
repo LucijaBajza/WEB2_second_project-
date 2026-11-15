@@ -23,24 +23,23 @@ if (!process.env.COOKIE_KEY) {
     throw new Error("Na Renderu mora biti postavljena varijabla COOKIE_KEY.");
   }
 
-  // Samo praktična lokalna vrijednost. U produkciji se mora postaviti vlastiti ključ.
+  // lokalno
   process.env.COOKIE_KEY = "lokalni-demo-cookie-key-promijeni-u-produkciji";
 }
 
-// Render terminira HTTPS na proxyju. To je potrebno za Secure cookie.
+// za ispravan rad kolacica
 app.set("trust proxy", 1);
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: false, limit: "20kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Signed cookies + req.user middleware iz auth.js.
+// ucitaj prijavljenog korisnika iz kolacica i postavi vrijednosti
 initCookieAuth(app, "/");
 
-// Postavka je globalna za edukacijsku demonstraciju i vraća se na sigurno
-// nakon ponovnog pokretanja besplatne Render instance.
 let csrfVulnerabilityEnabled = false;
 
+// provjera valjanosti tokena
 function isValidCsrfToken(req) {
   const received = req.body?.csrfToken;
   const expected = req.csrfToken;
@@ -58,6 +57,7 @@ function isValidCsrfToken(req) {
   );
 }
 
+// prikaz sucelja i dohvat korisnika iz baze
 async function renderPage(req, res, data = {}) {
   let users = [];
   let usersError = null;
@@ -112,8 +112,7 @@ async function renderPage(req, res, data = {}) {
 async function rejectInvalidCsrf(req, res) {
   res.status(403);
   await renderPage(req, res, {
-    notice:
-      "Zahtjev je odbijen: nedostaje ili nije valjan CSRF token. Račun nije obrisan.",
+    notice: "Zahtjev je odbijen.",
     noticeType: "error",
   });
 }
@@ -122,8 +121,7 @@ app.get("/", (req, res) => {
   return renderPage(req, res);
 });
 
-// Prijava i SQL Injection demonstracija.
-// Kod uspješne prijave postavljamo potpisane user i csrfToken cookieje.
+// prijava korisnika i SQL injection demonstracija
 app.post("/demo", async (req, res) => {
   const username = String(req.body.username ?? "");
   const password = String(req.body.password ?? "");
@@ -138,13 +136,14 @@ app.post("/demo", async (req, res) => {
   try {
     let result;
 
+    // ako je omogucena ranjivost
     if (sqlInjectionEnabled) {
-      // NAMJERNO RANJIVO: korisnički unos izravno se spaja u SQL upit.
+      // uzmi username i stavi ga u sql upit
       const sql = `SELECT id, username FROM users WHERE username = '${username}' AND password = '${password}' ORDER BY id`;
       result = await pool.query(sql);
       sqlPreview = `SELECT id, username FROM users WHERE username = '${username}' AND password = '********' ORDER BY id`;
     } else {
-      // SIGURNO: parametri se šalju odvojeno od SQL naredbe.
+      // sigurno, parametrizacija
       const sql =
         "SELECT id, username FROM users WHERE username = $1 AND password = $2 ORDER BY id";
       result = await pool.query(sql, [username, password]);
@@ -159,8 +158,10 @@ app.post("/demo", async (req, res) => {
       count: result.rows.length,
     };
 
+    // ako upit vrati barem jedan redak, prijavi prvog pronadenog korisnika
     if (result.rows.length > 0) {
       signedInUser = result.rows[0];
+      // generiraj novi CSRF token i postavi ga u kolacic
       csrfToken = signInUser(res, signedInUser.username);
     }
   } catch (error) {
@@ -178,28 +179,28 @@ app.post("/demo", async (req, res) => {
     databaseError,
     currentUser: signedInUser,
     csrfToken,
+    csrfVulnerabilityEnabled,
   });
 });
 
-// Prekidač je dostupan samo prijavljenom korisniku i uvijek traži valjani token.
+// ako je korisnik prijavljen, omoguci iskljucivanje/ukljucivanje ranjivosti
 app.post("/csrf-mode", requiresAuthentication, async (req, res) => {
   if (!isValidCsrfToken(req)) {
     return rejectInvalidCsrf(req, res);
   }
-
   csrfVulnerabilityEnabled = req.body.csrfVulnerabilityEnabled === "on";
   return res.redirect("/");
 });
 
-// Napadačka stranica šalje POST bez csrfToken polja.
+// brisanje racuna
 app.post("/account/delete", requiresAuthentication, async (req, res) => {
+  // mora biti ukljucena ranjivost i valjan token za napad, inace se odbija zahtjev
   if (!csrfVulnerabilityEnabled && !isValidCsrfToken(req)) {
     return rejectInvalidCsrf(req, res);
   }
 
   try {
-    // Cookie sadrži samo korisničko ime (kao u priloženom primjeru).
-    // Brišemo prvi zapis s tim korisničkim imenom, a ne ID koji šalje klijent.
+    // brisi korisnika iz baze
     const deleted = await pool.query(
       `DELETE FROM users
        WHERE id = (
@@ -211,7 +212,7 @@ app.post("/account/delete", requiresAuthentication, async (req, res) => {
 
     if (deleted.rowCount === 0) {
       return renderPage(req, res, {
-        notice: "Korisnički račun nije pronađen. Možda je već obrisan.",
+        notice: "Korisnički račun nije pronađen.",
         noticeType: "error",
       });
     }
@@ -236,6 +237,7 @@ app.post("/account/delete", requiresAuthentication, async (req, res) => {
   }
 });
 
+// odjava korisnika
 app.post("/logout", requiresAuthentication, async (req, res) => {
   if (!isValidCsrfToken(req)) {
     return rejectInvalidCsrf(req, res);
@@ -245,7 +247,7 @@ app.post("/logout", requiresAuthentication, async (req, res) => {
   return renderPage(req, res, {
     currentUser: null,
     csrfToken: "",
-    notice: "Uspješno si odjavljen/a.",
+    notice: "Uspješno ste odjavljeni.",
     noticeType: "success",
   });
 });

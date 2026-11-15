@@ -3,215 +3,223 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Demonstracija SQL Injection i CSRF napada</title>
+  <title>Demonstracija ranjivosti</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <main class="container">
-    <header class="page-header">
-      <p class="eyebrow">Sigurnost web-aplikacija</p>
-      <h1>Demonstracija ranjivosti</h1>
-      <p class="intro">
-        Isprobaj SQL Injection i CSRF. Svaku ranjivost možeš zasebno uključiti
-        ili isključiti pomoću prekidača.
+
+<main class="container">
+
+  <header class="page-header">
+    <h1>Demonstracija ranjivosti</h1>
+    <p>
+      Isprobajte SQL Injection i CSRF napade.
+    </p>
+  </header>
+
+  <% if (notice) { %>
+  <div class="notice <%= noticeType || '' %>" role="status">
+    <%= notice %>
+  </div>
+<% } %>
+
+  <!-- PRIJAVLJENI KORISNIK -->
+  <% if (currentUser) { %>
+    <section class="status-row">
+      <span>
+        Prijavljeni ste kao <strong><%= currentUser.username %></strong> (ID: <%= currentUser.id %>)
+      </span>
+
+      <form action="/logout" method="POST">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <button type="submit" class="btn-secondary">Odjava</button>
+      </form>
+    </section>
+  <% } else { %>
+    <div class="notice warning">
+      Trenutačno niste prijavljeni. Prijavite se u SQL Injection dijelu kako biste mogli isprobati CSRF.
+    </div>
+  <% } %>
+
+  <!-- SQL INJECTION -->
+  <section>
+    <h2>1. SQL Injection</h2>
+
+    <form action="/demo" method="POST">
+      <label class="checkbox-row">
+        <input
+          type="checkbox"
+          name="sqlInjectionEnabled"
+          <%= sqlInjectionEnabled ? 'checked' : '' %>
+        >
+        <span>Uključi SQL Injection ranjivost</span>
+      </label>
+
+      <p class="muted">
+        Prijava provjerava korisničko ime i lozinku u bazi.
+        Kada je ranjivost uključena, unos se izravno umeće u SQL upit.
+        Kada je isključena, koristi se parametrizirani upit.
       </p>
-    </header>
 
-    <% if (notice) { %>
-      <div class="alert <%= noticeType %>" role="status"><%= notice %></div>
-    <% } %>
+      <div class="form-row">
+        <label>
+          <span>Korisničko ime</span>
+          <input
+            type="text"
+            name="username"
+            value="<%= username %>"
+            placeholder="Npr. admin"
+            autocomplete="off"
+            required
+          >
+        </label>
 
-    <% if (currentUser) { %>
-      <section class="logged-in panel">
-        <div>
-          <strong>Prijavljen/a si kao <%= currentUser.username %></strong>
-          <span class="muted">(ID: <%= currentUser.id %>)</span>
+        <label>
+          <span>Lozinka</span>
+          <input
+            type="password"
+            name="password"
+            placeholder="Unesi lozinku"
+            autocomplete="off"
+            required
+          >
+        </label>
+      </div>
+
+      <p class="hint">
+        <strong>Napad:</strong> U korisničko ime unesite <code>' OR '1'='1' --</code>, lozinka može biti bilo što.<br>
+        <strong>Obična prijava:</strong> Na dnu stranice prikazani su korisnički računi. Za korisničko ime unesite neko od navedenih u tablici, 
+        a lozinka je korisnickoime123. Primjer: <code>ana / ana123.</code>
+      </p>
+
+      <button type="submit">Prijavi se / Pokreni napad</button>
+    </form>
+  </section>
+
+  <!-- REZULTAT SQL INJECTIONA -->
+  <% if (loginResult || sqlPreview || databaseError) { %>
+    <section aria-live="polite">
+      <h2>Rezultat SQL Injectiona</h2>
+
+      <% if (databaseError) { %>
+        <div class="notice error">
+          <strong>Pogreška:</strong> <%= databaseError %>
         </div>
-        <form action="/logout" method="POST">
-          <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
-          <button type="submit" class="button-secondary">Odjava</button>
-        </form>
-      </section>
-    <% } else { %>
-      <div class="alert neutral">Trenutačno nisi prijavljen/a. Prijavi se u SQL Injection dijelu kako bi mogao/la isprobati CSRF.</div>
-    <% } %>
-
-    <form action="/demo" method="POST" class="demo-form">
-      <section class="panel">
-        <div class="section-heading">
-          <div>
-            <span class="number">01</span>
-            <h2>SQL Injection</h2>
-          </div>
-          <label class="switch-label">
-            <input
-              type="checkbox"
-              name="sqlInjectionEnabled"
-              <%= sqlInjectionEnabled ? 'checked' : '' %>
-            >
-            <span>Ranjivost uključena</span>
-          </label>
-        </div>
-
-        <p class="description">
-          Prijava provjerava korisničko ime i lozinku u tablici
-          <code>users</code>. Kada je ranjivost uključena, korisnički unos
-          izravno se umeće u SQL upit. Kada je isključena, koristi se parametrizirani upit.
-          Uspješna prijava postavlja potpisani autentifikacijski cookie koji se koristi u CSRF demonstraciji.
-        </p>
-
-        <div class="fields two-columns">
-          <label>
-            Korisničko ime
-            <input
-              type="text"
-              name="username"
-              value="<%= username %>"
-              placeholder="Npr. admin"
-              autocomplete="off"
-              required
-            >
-          </label>
-          <label>
-            Lozinka
-            <input
-              type="password"
-              name="password"
-              placeholder="Unesi lozinku"
-              autocomplete="off"
-              required
-            >
-          </label>
+      <% } else if (loginResult && loginResult.success) { %>
+        <div class="notice success">
+          Prijava je uspjela.
         </div>
 
-        <div class="hint">
-          <strong>Testni unos za tautologiju:</strong>
-          <code>' OR '1'='1' --</code>
-          <span>Upiši ga u polje korisničkog imena, a u lozinku bilo što. Za običnu prijavu koristi npr. admin / admin123.</span>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Korisničko ime</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% loginResult.users.forEach((user) => { %>
+              <tr>
+                <td><%= user.id %></td>
+                <td><%= user.username %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } else { %>
+        <div class="notice error">
+          Prijava nije uspjela. Upit nije vratio nijednog korisnika.
         </div>
+      <% } %>
 
-        <div class="form-actions">
-          <button type="submit">Prijavi se / Pokreni SQL Injection</button>
-          <span>Prekidač se primjenjuje nakon slanja obrasca.</span>
-        </div>
-      </section>
+      <% if (sqlPreview) { %>
+        <h3>SQL upit</h3>
+        <p>Prikazan je SQL upit koji je izvršen.</p>
+        <pre><code><%= sqlPreview %></code></pre>
+      <% } %>
+    </section>
+  <% } %>
+
+  <!-- CSRF -->
+  <section>
+    <h2>2. Cross-Site Request Forgery (CSRF)</h2>
+
+    <form action="/csrf-mode" method="POST" id="csrf-mode-form">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+      <label class="checkbox-row <%= (!currentUser && csrfVulnerabilityEnabled) ? 'checkbox-disabled' : '' %>">
+        <input
+          type="checkbox"
+          name="csrfVulnerabilityEnabled"
+          onchange="this.form.submit()"
+          <%= csrfVulnerabilityEnabled === true ? 'checked' : '' %>
+          <%= (!currentUser && csrfVulnerabilityEnabled) ? 'disabled' : '' %>
+        >
+        <span>Uključi CSRF ranjivost</span>
+      </label>
     </form>
 
-    <% if (loginResult || sqlPreview || databaseError) { %>
-      <section class="results panel" aria-live="polite">
-        <div class="results-title">
-          <span class="number">REZULTAT</span>
-          <h2>SQL Injection – rezultat prijave</h2>
-        </div>
+    <p class="muted">
+      Napadačka stranica šalje zahtjev za brisanje računa u ime prijavljenog korisnika dok preglednik automatski prilaže cookie.
+    </p>    
 
-        <% if (databaseError) { %>
-          <div class="alert error"><strong>Pogreška:</strong> <%= databaseError %></div>
-        <% } else if (loginResult && loginResult.success) { %>
-          <div class="alert success">
-            Prijava je uspjela. Upit je vratio <strong><%= loginResult.count %></strong> korisnika.
-            Prijavljen/a si kao <strong><%= loginResult.users[0].username %></strong>. Potpisani cookie je postavljen.
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>ID</th><th>Korisničko ime</th></tr></thead>
-              <tbody>
-                <% loginResult.users.forEach((user) => { %>
-                  <tr><td><%= user.id %></td><td><%= user.username %></td></tr>
-                <% }) %>
-              </tbody>
-            </table>
-          </div>
-        <% } else { %>
-          <div class="alert neutral">Prijava nije uspjela. Upit nije vratio nijednog korisnika.</div>
-        <% } %>
-
-        <% if (sqlPreview) { %>
-          <h3>SQL upit</h3>
-          <pre><code><%= sqlPreview %></code></pre>
-        <% } %>
-      </section>
-    <% } %>
-
-    <section class="panel csrf-panel">
-      <div class="section-heading">
-        <div>
-          <span class="number">02</span>
-          <h2>Cross-Site Request Forgery (CSRF)</h2>
-        </div>
-        <span class="state <%= csrfVulnerabilityEnabled ? 'danger-state' : 'safe-state' %>">
-          <%= csrfVulnerabilityEnabled ? 'Ranjivo' : 'Zaštićeno' %>
-        </span>
-      </div>
-
-      <p class="description">
-        Napadačka stranica automatski šalje POST zahtjev za brisanje računa.
-        Ako si prijavljen/a, preglednik automatski šalje potpisani autentifikacijski cookie.
-        Kada je CSRF ranjivost uključena, poslužitelj ne provjerava token.
-        Kada je isključena, zahtjev mora sadržavati valjani CSRF token koji napadačka stranica ne može pročitati.
-      </p>
-
-      <form action="/csrf-mode" method="POST" class="mode-form">
-        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
-        <label class="switch-label">
-          <input
-            type="checkbox"
-            name="csrfVulnerabilityEnabled"
-            <%= csrfVulnerabilityEnabled ? 'checked' : '' %>
+    <% if (currentUser) { %>
+      <% if (attackerLink) { %>
+        <p>
+          <a
+            href="<%= attackerLink %>"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn-secondary"
           >
-          <span>CSRF ranjivost uključena (bez provjere tokena)</span>
-        </label>
-        <button type="submit" class="button-secondary">Spremi CSRF postavku</button>
-      </form>
-
-      <% if (currentUser) { %>
-        <% if (attackerLink) { %>
-          <div class="attack-box">
-            <div>
-              <strong>Pokreni napad</strong>
-              <p>Otvori napadačku stranicu. Ona će automatski poslati lažni zahtjev za brisanje trenutačno prijavljenog računa.</p>
-            </div>
-            <a class="button-link" href="<%= attackerLink %>" target="_blank" rel="noopener noreferrer">Otvori napadačku stranicu</a>
-          </div>
-        <% } else { %>
-          <div class="alert error">
-            Nije postavljen ATTACKER_URL. Na Renderu prvo objavi mapu attacker-site kao Static Site i dodaj njezin URL u varijablu ATTACKER_URL.
-          </div>
-        <% } %>
+            Otvori napadačku stranicu
+          </a>
+        </p>
       <% } else { %>
-        <div class="alert neutral">Za testiranje se prvo prijavi u gornjem dijelu stranice.</div>
-      <% } %>
-
-      <div class="hint">
-        <strong>Očekivani rezultat:</strong>
-        <span>Ranjivi način: račun se briše iz baze. Sigurni način: poslužitelj vraća HTTP 403 i račun ostaje u bazi.</span>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="results-title">
-        <span class="number">BAZA</span>
-        <h2>Trenutačni korisnički računi</h2>
-      </div>
-      <p class="description">Ovaj popis omogućuje vidjeti učinak CSRF napada nakon brisanja računa.</p>
-      <% if (usersError) { %>
-        <div class="alert error"><%= usersError %></div>
-      <% } else if (users.length === 0) { %>
-        <div class="alert neutral">U tablici users nema korisnika.</div>
-      <% } else { %>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>ID</th><th>Korisničko ime</th></tr></thead>
-            <tbody>
-              <% users.forEach((user) => { %>
-                <tr><td><%= user.id %></td><td><%= user.username %></td></tr>
-              <% }) %>
-            </tbody>
-          </table>
+        <div class="notice warning">
+          Nije postavljen <code>ATTACKER_URL</code>. Na Renderu objavi mapu <code>attacker-site</code> i dodaj njezin URL u varijablu <code>ATTACKER_URL</code>.
         </div>
       <% } %>
-    </section>
+    <% } else { %>
+      <div class="notice warning">
+        Za testiranje CSRF napada prvo se prijavite u SQL Injection dijelu.
+      </div>
+    <% } %>
+  </section>
 
-    <footer>Edukacijska demonstracija • Express + EJS + PostgreSQL</footer>
-  </main>
+  <!-- KORISNICI U BAZI -->
+  <section>
+    <h2>Trenutačni korisnički računi u bazi</h2>
+
+    <p class="muted">
+      Osvježite stranicu nakon napada kako biste vidjeli je li račun obrisan.
+    </p>
+
+    <% if (usersError) { %>
+      <div class="notice"><%= usersError %></div>
+    <% } else if (users.length === 0) { %>
+      <div class="notice">U tablici users nema korisnika.</div>
+    <% } else { %>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Korisničko ime</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach((user) => { %>
+            <tr>
+              <td><%= user.id %></td>
+              <td><%= user.username %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </section>
+
+</main>
+
 </body>
 </html>
